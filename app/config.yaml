@@ -27,3 +27,25 @@ routing:
     - slack
 
 default_level: warning
+
+escalation:
+  enabled: ${ESCALATION_ENABLED:false}
+  state_machine_arn: ${ESCALATION_STATE_MACHINE_ARN:}
+  trigger_levels:
+    - critical
+  timeout_minutes: 5
+  max_escalation_level: 3
+
+  oncall:
+    # Level 1: Primary on-call
+    - level: 1
+      name: "Primary On-Call"
+      phone: ${ONCALL_L1_PHONE:}
+    # Level 2: Secondary on-call
+    - level: 2
+      name: "Secondary On-Call"
+      phone: ${ONCALL_L2_PHONE:}
+    # Level 3: Manager
+    - level: 3
+      name: "Manager"
+      phone: ${ONCALL_L3_PHONE:}
