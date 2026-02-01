@@ -193,6 +193,122 @@ Resources:
       Principal: connect.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
+  # Escalation Lambda Functions
+  StartEscalationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub escalation-start-${StageName}
+      CodeUri: app
+      Handler: escalation.start.lambda_handler
+      Description: Starts escalation by creating alert record
+      Environment:
+        Variables:
+          ALERTS_TABLE_NAME: !Ref AlertsTable
+          POWERTOOLS_SERVICE_NAME: escalation-start
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt AlertsTable.Arn
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  MakeCallFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub escalation-call-${StageName}
+      CodeUri: app
+      Handler: escalation.call.lambda_handler
+      Description: Makes AWS Connect outbound call
+      Environment:
+        Variables:
+          AWS_CONNECT_INSTANCE_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_INSTANCE_ID}}"
+          AWS_CONNECT_CONTACT_FLOW_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_CONTACT_FLOW_ID}}"
+          AWS_CONNECT_SOURCE_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_SOURCE_PHONE}}"
+          POWERTOOLS_SERVICE_NAME: escalation-call
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - connect:StartOutboundVoiceContact
+              Resource:
+                - !Sub arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/*/contact/*
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  CheckAckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub escalation-check-ack-${StageName}
+      CodeUri: app
+      Handler: escalation.check_ack.lambda_handler
+      Description: Checks if alert has been acknowledged
+      Environment:
+        Variables:
+          ALERTS_TABLE_NAME: !Ref AlertsTable
+          POWERTOOLS_SERVICE_NAME: escalation-check-ack
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt AlertsTable.Arn
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  EscalateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub escalation-escalate-${StageName}
+      CodeUri: app
+      Handler: escalation.escalate.lambda_handler
+      Description: Escalates alert to next level
+      Environment:
+        Variables:
+          ALERTS_TABLE_NAME: !Ref AlertsTable
+          POWERTOOLS_SERVICE_NAME: escalation-escalate
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt AlertsTable.Arn
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  # Step Functions State Machine
+  EscalationStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub alert-escalation-${StageName}
+      DefinitionUri: statemachine/escalation.asl.json
+      DefinitionSubstitutions:
+        StartEscalationFunctionArn: !GetAtt StartEscalationFunction.Arn
+        MakeCallFunctionArn: !GetAtt MakeCallFunction.Arn
+        CheckAckFunctionArn: !GetAtt CheckAckFunction.Arn
+        EscalateFunctionArn: !GetAtt EscalateFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref StartEscalationFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref MakeCallFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CheckAckFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EscalateFunction
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
 Outputs:
   AlertBroadcasterFunctionArn:
     Description: Alert Broadcaster Lambda Function ARN
@@ -237,3 +353,9 @@ Outputs:
     Value: !GetAtt AckHandlerFunction.Arn
     Export:
       Name: !Sub ${AWS::StackName}-AckHandlerArn
+
+  EscalationStateMachineArn:
+    Description: Escalation Step Functions State Machine ARN
+    Value: !Ref EscalationStateMachine
+    Export:
+      Name: !Sub ${AWS::StackName}-EscalationStateMachineArn
