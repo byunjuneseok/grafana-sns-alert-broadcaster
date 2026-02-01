@@ -3,7 +3,7 @@ name = "alert-broadcaster"
 version = "0.1.0"
 description = "Alert Broadcaster - Routes Grafana alerts to multiple notification channels"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "boto3>=1.34.0",
     "dependency-injector[yaml]>=4.41.0",
@@ -28,7 +28,7 @@ package = false
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
@@ -40,7 +40,7 @@ lines-after-imports = 2
 known-first-party = ["channels", "container", "router", "handler"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
