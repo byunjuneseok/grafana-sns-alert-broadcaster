@@ -1,0 +1,23 @@
+version = 0.1
+
+[default.deploy.parameters]
+resolve_s3 = true
+s3_prefix = "alert-broadcaster"
+region = "ap-northeast-2"
+capabilities = "CAPABILITY_IAM"
+
+[rnd.deploy.parameters]
+stack_name = "alert-broadcaster-rnd"
+parameter_overrides = "StageName=rnd SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-rnd"
+
+[dev.deploy.parameters]
+stack_name = "alert-broadcaster-dev"
+parameter_overrides = "StageName=dev SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-dev"
+
+[stg.deploy.parameters]
+stack_name = "alert-broadcaster-stg"
+parameter_overrides = "StageName=stg SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-stg"
+
+[prd.deploy.parameters]
+stack_name = "alert-broadcaster-prd"
+parameter_overrides = "StageName=prd SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-prd"

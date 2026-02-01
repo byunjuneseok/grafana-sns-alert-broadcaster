@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Alert Broadcaster - Routes Grafana alerts to multiple notification channels
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.11
+    MemorySize: 256
+    Tracing: Active
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - rnd
+      - dev
+      - stg
+      - prd
+    Description: Deployment stage name
+
+  SNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic that receives Grafana alerts
+
+Resources:
+  AlertBroadcasterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub alert-broadcaster-${StageName}
+      CodeUri: app
+      Handler: handler.lambda_handler
+      Description: Processes Grafana alerts and routes to notification channels
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: alert-broadcaster
+          POWERTOOLS_LOG_LEVEL: INFO
+          # Telegram
+          TELEGRAM_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_ENABLED}}"
+          TELEGRAM_BOT_TOKEN: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_BOT_TOKEN}}"
+          TELEGRAM_CHAT_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_CHAT_ID}}"
+          # Slack
+          SLACK_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:SLACK_ENABLED}}"
+          SLACK_WEBHOOK_URL: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:SLACK_WEBHOOK_URL}}"
+          # AWS Connect
+          AWS_CONNECT_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_ENABLED}}"
+          AWS_CONNECT_INSTANCE_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_INSTANCE_ID}}"
+          AWS_CONNECT_CONTACT_FLOW_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_CONTACT_FLOW_ID}}"
+          AWS_CONNECT_SOURCE_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_SOURCE_PHONE}}"
+          AWS_CONNECT_DESTINATION_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_DESTINATION_PHONE}}"
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - connect:StartOutboundVoiceContact
+              Resource:
+                - !Sub arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/*/contact/*
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/alert-broadcaster-${StageName}:*
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+              Resource: "*"
+      Events:
+        SNSTrigger:
+          Type: SNS
+          Properties:
+            Topic: !Ref SNSTopicArn
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  AlertBroadcasterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/alert-broadcaster-${StageName}
+      RetentionInDays: 14
+
+  AlertBroadcasterErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub alert-broadcaster-${StageName}-errors
+      AlarmDescription: Alarm when Alert Broadcaster function has errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AlertBroadcasterFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  AlertBroadcasterFunctionArn:
+    Description: Alert Broadcaster Lambda Function ARN
+    Value: !GetAtt AlertBroadcasterFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-FunctionArn
+
+  AlertBroadcasterFunctionName:
+    Description: Alert Broadcaster Lambda Function Name
+    Value: !Ref AlertBroadcasterFunction
