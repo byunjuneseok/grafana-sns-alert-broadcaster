@@ -1,0 +1,29 @@
+channels:
+  telegram:
+    enabled: ${TELEGRAM_ENABLED:false}
+    bot_token: ${TELEGRAM_BOT_TOKEN:}
+    chat_id: ${TELEGRAM_CHAT_ID:}
+
+  slack:
+    enabled: ${SLACK_ENABLED:false}
+    webhook_url: ${SLACK_WEBHOOK_URL:}
+
+  aws_connect:
+    enabled: ${AWS_CONNECT_ENABLED:false}
+    instance_id: ${AWS_CONNECT_INSTANCE_ID:}
+    contact_flow_id: ${AWS_CONNECT_CONTACT_FLOW_ID:}
+    source_phone_number: ${AWS_CONNECT_SOURCE_PHONE:}
+    destination_phone_number: ${AWS_CONNECT_DESTINATION_PHONE:}
+
+routing:
+  error:
+    - telegram
+    - slack
+    - aws_connect
+  warning:
+    - telegram
+    - slack
+  info:
+    - slack
+
+default_level: warning
