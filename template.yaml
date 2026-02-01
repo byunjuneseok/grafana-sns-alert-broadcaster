@@ -91,6 +91,14 @@ Resources:
           AWS_CONNECT_CONTACT_FLOW_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_CONTACT_FLOW_ID}}"
           AWS_CONNECT_SOURCE_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_SOURCE_PHONE}}"
           AWS_CONNECT_DESTINATION_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_DESTINATION_PHONE}}"
+          # Escalation
+          ESCALATION_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ESCALATION_ENABLED}}"
+          ESCALATION_STATE_MACHINE_ARN: !Ref EscalationStateMachine
+          ESCALATION_TRIGGER_LEVELS: "critical"
+          ESCALATION_MAX_LEVEL: "3"
+          ONCALL_L1_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L1_PHONE}}"
+          ONCALL_L2_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L2_PHONE}}"
+          ONCALL_L3_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L3_PHONE}}"
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -111,6 +119,11 @@ Resources:
                 - xray:PutTraceSegments
                 - xray:PutTelemetryRecords
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource:
+                - !Ref EscalationStateMachine
       Events:
         SNSTrigger:
           Type: SNS
