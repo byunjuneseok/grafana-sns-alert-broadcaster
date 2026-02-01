@@ -52,11 +52,15 @@ Resources:
       TableName: !Sub alerts-${StageName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: alert_id
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
           AttributeType: S
       KeySchema:
-        - AttributeName: alert_id
+        - AttributeName: PK
           KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
@@ -78,27 +82,19 @@ Resources:
           LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: alert-broadcaster
           POWERTOOLS_LOG_LEVEL: INFO
-          # Telegram
           TELEGRAM_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_ENABLED}}"
           TELEGRAM_BOT_TOKEN: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_BOT_TOKEN}}"
           TELEGRAM_CHAT_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:TELEGRAM_CHAT_ID}}"
-          # Slack
           SLACK_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:SLACK_ENABLED}}"
           SLACK_WEBHOOK_URL: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:SLACK_WEBHOOK_URL}}"
-          # AWS Connect
           AWS_CONNECT_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_ENABLED}}"
           AWS_CONNECT_INSTANCE_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_INSTANCE_ID}}"
           AWS_CONNECT_CONTACT_FLOW_ID: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_CONTACT_FLOW_ID}}"
           AWS_CONNECT_SOURCE_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_SOURCE_PHONE}}"
           AWS_CONNECT_DESTINATION_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:AWS_CONNECT_DESTINATION_PHONE}}"
-          # Escalation
           ESCALATION_ENABLED: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ESCALATION_ENABLED}}"
           ESCALATION_STATE_MACHINE_ARN: !Ref EscalationStateMachine
           ESCALATION_TRIGGER_LEVELS: "critical"
-          ESCALATION_MAX_LEVEL: "3"
-          ONCALL_L1_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L1_PHONE}}"
-          ONCALL_L2_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L2_PHONE}}"
-          ONCALL_L3_PHONE: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:ONCALL_L3_PHONE}}"
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -299,7 +295,59 @@ Resources:
         Environment: !Ref StageName
         Project: alert-broadcaster
 
-  # Step Functions State Machine
+  GetOnCallFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub oncall-get-${StageName}
+      CodeUri: app
+      Handler: oncall.get_handler.lambda_handler
+      Description: Gets current on-call person for escalation level
+      Environment:
+        Variables:
+          ALERTS_TABLE_NAME: !Ref AlertsTable
+          POWERTOOLS_SERVICE_NAME: oncall-get
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: !GetAtt AlertsTable.Arn
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
+  RotateOnCallFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub oncall-rotate-${StageName}
+      CodeUri: app
+      Handler: oncall.rotate_handler.lambda_handler
+      Description: Rotates on-call schedule weekly
+      Environment:
+        Variables:
+          ALERTS_TABLE_NAME: !Ref AlertsTable
+          POWERTOOLS_SERVICE_NAME: oncall-rotate
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+              Resource: !GetAtt AlertsTable.Arn
+      Events:
+        WeeklyRotation:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 0 ? * MON *)
+            Description: Rotate on-call every Monday at 00:00 UTC
+      Tags:
+        Environment: !Ref StageName
+        Project: alert-broadcaster
+
   EscalationStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
@@ -307,12 +355,15 @@ Resources:
       DefinitionUri: statemachine/escalation.asl.json
       DefinitionSubstitutions:
         StartEscalationFunctionArn: !GetAtt StartEscalationFunction.Arn
+        GetOnCallFunctionArn: !GetAtt GetOnCallFunction.Arn
         MakeCallFunctionArn: !GetAtt MakeCallFunction.Arn
         CheckAckFunctionArn: !GetAtt CheckAckFunction.Arn
         EscalateFunctionArn: !GetAtt EscalateFunction.Arn
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref StartEscalationFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetOnCallFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref MakeCallFunction
         - LambdaInvokePolicy:
