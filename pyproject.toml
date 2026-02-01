@@ -1,0 +1,56 @@
+[project]
+name = "alert-broadcaster"
+version = "0.1.0"
+description = "Alert Broadcaster - Routes Grafana alerts to multiple notification channels"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.34.0",
+    "dependency-injector[yaml]>=4.41.0",
+    "aws-lambda-powertools>=2.30.0",
+    "aws-xray-sdk>=2.12.0",
+    "pydantic>=2.5.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "moto[sns,secretsmanager,connect]>=4.2.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "boto3-stubs[sns,secretsmanager,connect]>=1.34.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+force-single-line = false
+lines-after-imports = 2
+known-first-party = ["channels", "container", "router", "handler"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[dependency-groups]
+dev = [
+    "python-dotenv>=1.2.1",
+]
