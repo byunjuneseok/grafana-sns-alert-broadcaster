@@ -31,7 +31,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     alert_id = event["alert_id"]
 
     try:
-        response = table.get_item(Key={"alert_id": alert_id})
+        response = table.get_item(Key={"PK": f"ALERT#{alert_id}", "SK": "METADATA"})
         item = response.get("Item")
 
         if not item:

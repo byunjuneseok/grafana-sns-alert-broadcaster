@@ -79,7 +79,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
     try:
         response = table.update_item(
-            Key={"alert_id": alert_id},
+            Key={"PK": f"ALERT#{alert_id}", "SK": "METADATA"},
             UpdateExpression="SET #status = :status, acked_by = :acked_by, acked_at = :acked_at",
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
@@ -87,7 +87,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
                 ":acked_by": acked_by,
                 ":acked_at": datetime.utcnow().isoformat(),
             },
-            ConditionExpression="attribute_exists(alert_id)",
+            ConditionExpression="attribute_exists(PK)",
             ReturnValues="ALL_NEW",
         )
 

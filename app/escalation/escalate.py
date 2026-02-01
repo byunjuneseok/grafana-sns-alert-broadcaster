@@ -39,7 +39,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
     if should_continue:
         table.update_item(
-            Key={"alert_id": alert_id},
+            Key={"PK": f"ALERT#{alert_id}", "SK": "METADATA"},
             UpdateExpression="SET current_level = :level, updated_at = :updated_at",
             ExpressionAttributeValues={
                 ":level": new_level,

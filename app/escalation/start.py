@@ -41,6 +41,8 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     ttl = int(time.time()) + TTL_SECONDS
 
     item = {
+        "PK": f"ALERT#{alert_id}",
+        "SK": "METADATA",
         "alert_id": alert_id,
         "status": "pending",
         "current_level": 1,
