@@ -1,4 +1,3 @@
-import json
 import os
 from datetime import datetime
 
@@ -16,26 +15,31 @@ table = dynamodb.Table(os.environ.get("ALERTS_TABLE_NAME", "alerts"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
-    logger.info("Received ACK request", event=event)
+    """
+    Handles ACK from AWS Connect Contact Flow.
 
-    # Extract alert_id from path parameters
-    alert_id = event.get("pathParameters", {}).get("alert_id")
+    AWS Connect invokes Lambda with contact attributes.
+    Expected attributes:
+      - alert_id: The alert ID to acknowledge
+      - acked_by: Phone number or name of the person who acknowledged
+
+    Returns a response that AWS Connect can use in the contact flow.
+    """
+    logger.info("Received ACK request from AWS Connect", event=event)
+
+    # Extract from AWS Connect contact attributes
+    details = event.get("Details", {})
+    contact_data = details.get("ContactData", {})
+    attributes = contact_data.get("Attributes", {})
+
+    alert_id = attributes.get("alert_id")
+    acked_by = attributes.get("acked_by") or contact_data.get("CustomerEndpoint", {}).get("Address", "unknown")
+
     if not alert_id:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "alert_id is required"}),
-        }
-
-    # Extract acked_by from body or query params
-    body = {}
-    if event.get("body"):
-        body = json.loads(event["body"])
-
-    acked_by = body.get("acked_by") or event.get("queryStringParameters", {}).get("acked_by", "unknown")
+        logger.error("alert_id not provided in contact attributes")
+        return {"status": "error", "message": "alert_id is required"}
 
     try:
-        # Update alert status in DynamoDB
         response = table.update_item(
             Key={"alert_id": alert_id},
             UpdateExpression="SET #status = :status, acked_by = :acked_by, acked_at = :acked_at",
@@ -51,29 +55,18 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
         logger.info("Alert acknowledged", alert_id=alert_id, acked_by=acked_by)
 
+        # Return response for AWS Connect
         return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps(
-                {
-                    "message": "Alert acknowledged",
-                    "alert_id": alert_id,
-                    "acked_by": acked_by,
-                }
-            ),
+            "status": "success",
+            "message": "Alert acknowledged",
+            "alert_id": alert_id,
+            "acked_by": acked_by,
         }
 
     except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
         logger.warning("Alert not found", alert_id=alert_id)
-        return {
-            "statusCode": 404,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Alert not found"}),
-        }
+        return {"status": "error", "message": "Alert not found"}
+
     except Exception as e:
         logger.exception("Failed to acknowledge alert")
-        return {
-            "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": str(e)}),
-        }
+        return {"status": "error", "message": str(e)}
