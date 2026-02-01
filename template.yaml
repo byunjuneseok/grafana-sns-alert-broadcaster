@@ -168,6 +168,7 @@ Resources:
           ALERTS_TABLE_NAME: !Ref AlertsTable
           POWERTOOLS_SERVICE_NAME: ack-handler
           POWERTOOLS_LOG_LEVEL: INFO
+          SLACK_WEBHOOK_URL: !Sub "{{resolve:secretsmanager:${StageName}/alert-broadcaster:SecretString:SLACK_WEBHOOK_URL}}"
       Policies:
         - Version: "2012-10-17"
           Statement:
