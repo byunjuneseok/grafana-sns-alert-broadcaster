@@ -46,6 +46,26 @@ Resources:
             Action: sns:Publish
             Resource: !Ref GrafanaAlertsTopic
 
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub alerts-${StageName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: alert_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alert_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref StageName
+        - Key: Project
+          Value: alert-broadcaster
+
   AlertBroadcasterFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -151,3 +171,13 @@ Outputs:
           "Resource": "${GrafanaAlertsTopic}"
         }]
       }
+
+  AlertsTableArn:
+    Description: DynamoDB Alerts Table ARN
+    Value: !GetAtt AlertsTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-AlertsTableArn
+
+  AlertsTableName:
+    Description: DynamoDB Alerts Table Name
+    Value: !Ref AlertsTable
