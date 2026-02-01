@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 import boto3
+import requests
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -10,6 +11,43 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ.get("ALERTS_TABLE_NAME", "alerts"))
+
+
+def send_slack_ack_notification(alert_id: str, alert_title: str, acked_by: str) -> bool:
+    """Send ACK notification to Slack."""
+    webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        logger.warning("SLACK_WEBHOOK_URL not configured, skipping Slack notification")
+        return False
+
+    message = {
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f":white_check_mark: *Alert Acknowledged*\n*{alert_title}*",
+                },
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {"type": "mrkdwn", "text": f"*Acknowledged by:* {acked_by}"},
+                    {"type": "mrkdwn", "text": f"*Alert ID:* {alert_id}"},
+                    {"type": "mrkdwn", "text": f"*Time:* {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"},
+                ],
+            },
+        ]
+    }
+
+    try:
+        response = requests.post(webhook_url, json=message, timeout=10)
+        response.raise_for_status()
+        logger.info("Slack ACK notification sent")
+        return True
+    except Exception as e:
+        logger.exception("Failed to send Slack ACK notification")
+        return False
 
 
 @logger.inject_lambda_context
@@ -54,6 +92,13 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
         )
 
         logger.info("Alert acknowledged", alert_id=alert_id, acked_by=acked_by)
+
+        # Get alert title from updated item
+        updated_item = response.get("Attributes", {})
+        alert_title = updated_item.get("alert_title", "Unknown Alert")
+
+        # Send Slack notification
+        send_slack_ack_notification(alert_id, alert_title, acked_by)
 
         # Return response for AWS Connect
         return {
