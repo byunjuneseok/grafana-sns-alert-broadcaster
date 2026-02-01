@@ -5,7 +5,7 @@ Description: Alert Broadcaster - Routes Grafana alerts to multiple notification 
 Globals:
   Function:
     Timeout: 30
-    Runtime: python3.11
+    Runtime: python3.13
     MemorySize: 256
     Tracing: Active
 
@@ -20,11 +20,32 @@ Parameters:
       - prd
     Description: Deployment stage name
 
-  SNSTopicArn:
-    Type: String
-    Description: ARN of the SNS topic that receives Grafana alerts
-
 Resources:
+  GrafanaAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub grafana-alerts-${StageName}
+      Tags:
+        - Key: Environment
+          Value: !Ref StageName
+        - Key: Project
+          Value: alert-broadcaster
+
+  GrafanaAlertsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref GrafanaAlertsTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowGrafanaPublish
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: sns:Publish
+            Resource: !Ref GrafanaAlertsTopic
+
   AlertBroadcasterFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -74,7 +95,7 @@ Resources:
         SNSTrigger:
           Type: SNS
           Properties:
-            Topic: !Ref SNSTopicArn
+            Topic: !Ref GrafanaAlertsTopic
       Tags:
         Environment: !Ref StageName
         Project: alert-broadcaster
@@ -112,3 +133,21 @@ Outputs:
   AlertBroadcasterFunctionName:
     Description: Alert Broadcaster Lambda Function Name
     Value: !Ref AlertBroadcasterFunction
+
+  GrafanaAlertsTopicArn:
+    Description: SNS Topic ARN for Grafana alerts
+    Value: !Ref GrafanaAlertsTopic
+    Export:
+      Name: !Sub ${AWS::StackName}-TopicArn
+
+  GrafanaPublishPolicy:
+    Description: IAM Policy for Grafana to publish to SNS (use for IRSA)
+    Value: !Sub |
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Effect": "Allow",
+          "Action": "sns:Publish",
+          "Resource": "${GrafanaAlertsTopic}"
+        }]
+      }

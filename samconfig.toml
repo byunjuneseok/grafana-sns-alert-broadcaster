@@ -8,16 +8,16 @@ capabilities = "CAPABILITY_IAM"
 
 [rnd.deploy.parameters]
 stack_name = "alert-broadcaster-rnd"
-parameter_overrides = "StageName=rnd SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-rnd"
+parameter_overrides = "StageName=rnd"
 
 [dev.deploy.parameters]
 stack_name = "alert-broadcaster-dev"
-parameter_overrides = "StageName=dev SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-dev"
+parameter_overrides = "StageName=dev"
 
 [stg.deploy.parameters]
 stack_name = "alert-broadcaster-stg"
-parameter_overrides = "StageName=stg SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-stg"
+parameter_overrides = "StageName=stg"
 
 [prd.deploy.parameters]
 stack_name = "alert-broadcaster-prd"
-parameter_overrides = "StageName=prd SNSTopicArn=arn:aws:sns:ap-northeast-2:ACCOUNT_ID:grafana-alerts-prd"
+parameter_overrides = "StageName=prd"
