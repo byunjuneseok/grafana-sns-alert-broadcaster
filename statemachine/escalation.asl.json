@@ -6,69 +6,42 @@
       "Type": "Task",
       "Resource": "${StartEscalationFunctionArn}",
       "ResultPath": "$.escalation",
-      "Next": "GetOnCallPhone"
+      "Next": "GetOnCall"
     },
-    "GetOnCallPhone": {
+    "GetOnCall": {
+      "Type": "Task",
+      "Resource": "${GetOnCallFunctionArn}",
+      "Parameters": {
+        "level.$": "$.escalation.current_level"
+      },
+      "ResultPath": "$.oncall",
+      "Next": "CheckOnCallFound"
+    },
+    "CheckOnCallFound": {
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.escalation.current_level",
-          "NumericEquals": 1,
-          "Next": "SetLevel1Phone"
-        },
-        {
-          "Variable": "$.escalation.current_level",
-          "NumericEquals": 2,
-          "Next": "SetLevel2Phone"
-        },
-        {
-          "Variable": "$.escalation.current_level",
-          "NumericEquals": 3,
-          "Next": "SetLevel3Phone"
+          "Variable": "$.oncall.found",
+          "BooleanEquals": true,
+          "Next": "MakeCall"
         }
       ],
-      "Default": "EscalationComplete"
+      "Default": "NoOnCallFound"
     },
-    "SetLevel1Phone": {
-      "Type": "Pass",
-      "Parameters": {
-        "alert_id.$": "$.escalation.alert_id",
-        "alert_title.$": "$.escalation.alert_title",
-        "current_level.$": "$.escalation.current_level",
-        "phone_number.$": "$.oncall.level1_phone",
-        "max_level.$": "$.oncall.max_level"
-      },
-      "ResultPath": "$.call_params",
-      "Next": "MakeCall"
-    },
-    "SetLevel2Phone": {
-      "Type": "Pass",
-      "Parameters": {
-        "alert_id.$": "$.escalation.alert_id",
-        "alert_title.$": "$.escalation.alert_title",
-        "current_level.$": "$.escalation.current_level",
-        "phone_number.$": "$.oncall.level2_phone",
-        "max_level.$": "$.oncall.max_level"
-      },
-      "ResultPath": "$.call_params",
-      "Next": "MakeCall"
-    },
-    "SetLevel3Phone": {
-      "Type": "Pass",
-      "Parameters": {
-        "alert_id.$": "$.escalation.alert_id",
-        "alert_title.$": "$.escalation.alert_title",
-        "current_level.$": "$.escalation.current_level",
-        "phone_number.$": "$.oncall.level3_phone",
-        "max_level.$": "$.oncall.max_level"
-      },
-      "ResultPath": "$.call_params",
-      "Next": "MakeCall"
+    "NoOnCallFound": {
+      "Type": "Fail",
+      "Error": "NoOnCallFound",
+      "Cause": "No on-call person found for this level"
     },
     "MakeCall": {
       "Type": "Task",
       "Resource": "${MakeCallFunctionArn}",
-      "InputPath": "$.call_params",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id",
+        "alert_title.$": "$.escalation.alert_title",
+        "phone_number.$": "$.oncall.phone",
+        "current_level.$": "$.escalation.current_level"
+      },
       "ResultPath": "$.call_result",
       "Next": "WaitForAck"
     },
@@ -107,7 +80,7 @@
       "Parameters": {
         "alert_id.$": "$.escalation.alert_id",
         "current_level.$": "$.escalation.current_level",
-        "max_level.$": "$.oncall.max_level"
+        "max_level": 3
       },
       "ResultPath": "$.escalate_result",
       "Next": "ShouldContinue"
@@ -130,10 +103,9 @@
           "alert_id.$": "$.escalation.alert_id",
           "alert_title.$": "$.escalation.alert_title",
           "current_level.$": "$.escalate_result.new_level"
-        },
-        "oncall.$": "$.oncall"
+        }
       },
-      "Next": "GetOnCallPhone"
+      "Next": "GetOnCall"
     },
     "EscalationComplete": {
       "Type": "Fail",
