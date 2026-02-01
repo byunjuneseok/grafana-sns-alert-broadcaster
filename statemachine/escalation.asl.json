@@ -1,0 +1,144 @@
+{
+  "Comment": "Alert Escalation State Machine",
+  "StartAt": "StartEscalation",
+  "States": {
+    "StartEscalation": {
+      "Type": "Task",
+      "Resource": "${StartEscalationFunctionArn}",
+      "ResultPath": "$.escalation",
+      "Next": "GetOnCallPhone"
+    },
+    "GetOnCallPhone": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.escalation.current_level",
+          "NumericEquals": 1,
+          "Next": "SetLevel1Phone"
+        },
+        {
+          "Variable": "$.escalation.current_level",
+          "NumericEquals": 2,
+          "Next": "SetLevel2Phone"
+        },
+        {
+          "Variable": "$.escalation.current_level",
+          "NumericEquals": 3,
+          "Next": "SetLevel3Phone"
+        }
+      ],
+      "Default": "EscalationComplete"
+    },
+    "SetLevel1Phone": {
+      "Type": "Pass",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id",
+        "alert_title.$": "$.escalation.alert_title",
+        "current_level.$": "$.escalation.current_level",
+        "phone_number.$": "$.oncall.level1_phone",
+        "max_level.$": "$.oncall.max_level"
+      },
+      "ResultPath": "$.call_params",
+      "Next": "MakeCall"
+    },
+    "SetLevel2Phone": {
+      "Type": "Pass",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id",
+        "alert_title.$": "$.escalation.alert_title",
+        "current_level.$": "$.escalation.current_level",
+        "phone_number.$": "$.oncall.level2_phone",
+        "max_level.$": "$.oncall.max_level"
+      },
+      "ResultPath": "$.call_params",
+      "Next": "MakeCall"
+    },
+    "SetLevel3Phone": {
+      "Type": "Pass",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id",
+        "alert_title.$": "$.escalation.alert_title",
+        "current_level.$": "$.escalation.current_level",
+        "phone_number.$": "$.oncall.level3_phone",
+        "max_level.$": "$.oncall.max_level"
+      },
+      "ResultPath": "$.call_params",
+      "Next": "MakeCall"
+    },
+    "MakeCall": {
+      "Type": "Task",
+      "Resource": "${MakeCallFunctionArn}",
+      "InputPath": "$.call_params",
+      "ResultPath": "$.call_result",
+      "Next": "WaitForAck"
+    },
+    "WaitForAck": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "CheckAck"
+    },
+    "CheckAck": {
+      "Type": "Task",
+      "Resource": "${CheckAckFunctionArn}",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id"
+      },
+      "ResultPath": "$.ack_result",
+      "Next": "IsAcked"
+    },
+    "IsAcked": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ack_result.is_acked",
+          "BooleanEquals": true,
+          "Next": "AckReceived"
+        }
+      ],
+      "Default": "Escalate"
+    },
+    "AckReceived": {
+      "Type": "Succeed",
+      "Comment": "Alert was acknowledged"
+    },
+    "Escalate": {
+      "Type": "Task",
+      "Resource": "${EscalateFunctionArn}",
+      "Parameters": {
+        "alert_id.$": "$.escalation.alert_id",
+        "current_level.$": "$.escalation.current_level",
+        "max_level.$": "$.oncall.max_level"
+      },
+      "ResultPath": "$.escalate_result",
+      "Next": "ShouldContinue"
+    },
+    "ShouldContinue": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.escalate_result.should_continue",
+          "BooleanEquals": true,
+          "Next": "UpdateLevel"
+        }
+      ],
+      "Default": "EscalationComplete"
+    },
+    "UpdateLevel": {
+      "Type": "Pass",
+      "Parameters": {
+        "escalation": {
+          "alert_id.$": "$.escalation.alert_id",
+          "alert_title.$": "$.escalation.alert_title",
+          "current_level.$": "$.escalate_result.new_level"
+        },
+        "oncall.$": "$.oncall"
+      },
+      "Next": "GetOnCallPhone"
+    },
+    "EscalationComplete": {
+      "Type": "Fail",
+      "Error": "EscalationExhausted",
+      "Cause": "All escalation levels exhausted without acknowledgement"
+    }
+  }
+}
