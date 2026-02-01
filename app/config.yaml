@@ -33,7 +33,7 @@ escalation:
   state_machine_arn: ${ESCALATION_STATE_MACHINE_ARN:}
   trigger_levels:
     - critical
-  timeout_minutes: 5
+  timeout_minutes: 1
   max_escalation_level: 3
 
   oncall:
