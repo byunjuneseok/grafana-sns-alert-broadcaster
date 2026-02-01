@@ -27,7 +27,6 @@ def should_escalate(alert: Alert) -> bool:
 
 
 def start_escalation(alert: Alert) -> dict | None:
-    """Start Step Functions escalation workflow."""
     state_machine_arn = os.environ.get("ESCALATION_STATE_MACHINE_ARN")
     if not state_machine_arn:
         logger.warning("ESCALATION_STATE_MACHINE_ARN not configured")
@@ -38,12 +37,6 @@ def start_escalation(alert: Alert) -> dict | None:
         "alert_description": alert.description,
         "severity": alert.level,
         "fingerprint": alert.fingerprint,
-        "oncall": {
-            "level1_phone": os.environ.get("ONCALL_L1_PHONE", ""),
-            "level2_phone": os.environ.get("ONCALL_L2_PHONE", ""),
-            "level3_phone": os.environ.get("ONCALL_L3_PHONE", ""),
-            "max_level": int(os.environ.get("ESCALATION_MAX_LEVEL", "3")),
-        },
     }
 
     try:
