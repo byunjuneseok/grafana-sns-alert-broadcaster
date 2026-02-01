@@ -1,0 +1,22 @@
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventVersion": "1.0",
+      "EventSubscriptionArn": "arn:aws:sns:us-east-1:123456789012:grafana-alerts:12345678-1234-1234-1234-123456789012",
+      "Sns": {
+        "Type": "Notification",
+        "MessageId": "12345678-1234-1234-1234-123456789012",
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:grafana-alerts",
+        "Subject": "Grafana Alert",
+        "Message": "{\"status\":\"firing\",\"alerts\":[{\"status\":\"firing\",\"labels\":{\"alertname\":\"HighCPUUsage\",\"severity\":\"error\",\"instance\":\"web-server-01\",\"job\":\"node-exporter\"},\"annotations\":{\"summary\":\"CPU usage is critically high\",\"description\":\"CPU usage on web-server-01 has exceeded 90% for more than 5 minutes\"},\"startsAt\":\"2024-01-15T10:00:00.000Z\",\"endsAt\":\"0001-01-01T00:00:00Z\",\"generatorURL\":\"http://grafana.example.com/alerting/grafana/abc123/view\",\"fingerprint\":\"abc123def456\",\"dashboardURL\":\"http://grafana.example.com/d/abc123\",\"panelURL\":\"http://grafana.example.com/d/abc123?viewPanel=1\",\"valueString\":\"[ var='A' labels={instance=web-server-01} value=95.5 ]\"}],\"groupLabels\":{\"alertname\":\"HighCPUUsage\"},\"commonLabels\":{\"alertname\":\"HighCPUUsage\",\"severity\":\"error\"},\"commonAnnotations\":{\"summary\":\"CPU usage is critically high\"},\"externalURL\":\"http://grafana.example.com/\",\"version\":\"1\",\"groupKey\":\"{}:{alertname=\\\"HighCPUUsage\\\"}\",\"truncatedAlerts\":0,\"orgId\":1,\"title\":\"[FIRING:1] HighCPUUsage\",\"state\":\"alerting\",\"message\":\"**Firing**\\n\\nValue: [ var='A' labels={instance=web-server-01} value=95.5 ]\\nLabels:\\n - alertname = HighCPUUsage\\n - instance = web-server-01\\n - job = node-exporter\\n - severity = error\\nAnnotations:\\n - summary = CPU usage is critically high\\nSource: http://grafana.example.com/alerting/grafana/abc123/view\\nSilence: http://grafana.example.com/alerting/silence/new?alertmanager=grafana\"}",
+        "Timestamp": "2024-01-15T10:00:00.000Z",
+        "SignatureVersion": "1",
+        "Signature": "...",
+        "SigningCertUrl": "...",
+        "UnsubscribeUrl": "...",
+        "MessageAttributes": {}
+      }
+    }
+  ]
+}
